@@ -1,0 +1,25 @@
+;; data/datascript-tx.edn — DataScript tx-data derived from src/association/facts.cljc
+;; `association.facts/catalog` (ADR-2607141700 Wave 0). Same shape as sibling files.
+
+[#:association-rule{:id "fti.predecessor-ati-1967-11-13"
+                     :title "The Association of Thai Industries (ATI), FTI's direct predecessor, came into existence on 13 November 1967 (en.wikipedia.org)"
+                     :association "fti"
+                     :isic "9411"
+                     :country "THA"
+                     :kind :governance-program
+                     :url "https://en.wikipedia.org/wiki/Federation_of_Thai_Industries"
+                     :url-provenance :wikipedia-corroborated
+                     :established-date "1967-11-13"
+                     :retrieved-at "2026-07-17"
+                     :topic [:governance]}
+ #:association-rule{:id "fti.founding-1987-12-29-upgrade"
+                     :title "ATI was upgraded on 29 December 1987 to become the Federation of Thai Industries (FTI) (en.wikipedia.org, corroborated by Wikidata Q4924184 inception statement)"
+                     :association "fti"
+                     :isic "9411"
+                     :country "THA"
+                     :kind :governance-program
+                     :url "https://en.wikipedia.org/wiki/Federation_of_Thai_Industries"
+                     :url-provenance :wikipedia-corroborated
+                     :established-date "1987-12-29"
+                     :retrieved-at "2026-07-17"
+                     :topic [:governance]}]

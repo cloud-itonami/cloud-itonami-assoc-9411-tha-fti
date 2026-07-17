@@ -1,0 +1,11 @@
+;; Real-world organization identity/contact.
+;; :head-role is institutional title only -- no personal names.
+{:name-en "Federation of Thai Industries (FTI)"
+ :abbreviation "FTI"
+ :official-url "https://www.fti.or.th/"
+ :wikidata "Q4924184"
+ :isic "9411"
+ :country "THA"
+ :established-date "1987-12-29"
+ :head-role-note "institutional office title only (Chairman/President); personal names of current/former office-holders incidentally encountered but never persisted here"
+ :sourced-from "fti.or.th's own domain rendered successfully but did not surface founding-history detail on the pages checked this tick (a guessed ftithailand.com alternate domain returned a DNS resolution failure). Verified instead directly (WebFetch) against en.wikipedia.org's own article, which states verbatim that the 'Association of Thai Industries (ATI), came into existence on 13 November 1967' and was 'upgraded on 29 December 1987' to become FTI. The 29 December 1987 date is independently corroborated by Wikidata Q4924184's own inception statement."}
