@@ -1,0 +1,222 @@
+#!/usr/bin/env nbb
+(ns run-suite
+  "Execute this repository's suite and report how many tests actually ran.
+
+  ## Why this exists
+
+  On 2026-09-10 every Clojure source here was renamed to `.kotoba` without a
+  byte of its contents changing (34daed3). `.kotoba` is not an extension
+  `clojure.tools.namespace` scans, and that is what `cognitect.test-runner`
+  uses to find tests, so from that commit onward the documented command
+  reported:
+
+      $ clojure -M:test
+      Ran 0 tests containing 0 assertions.
+      0 failures, 0 errors.                       exit 0
+
+  One commit earlier the same command reported 10 tests / 60 assertions --
+  also exit 0. **A suite that could not run returned the same value as a suite
+  that ran and passed.** That is questions 2 and 4 of the eight in CLAUDE.md.
+  The catalog parity gate -- the whole reason a twenty-entry catalog written
+  three times is safe to keep -- was checked by no one in between.
+
+  Modeled on `orgs/cloud-itonami/cloud-itonami-isco-3117`'s test/run_suite.cljs
+  and `-isco-2519`'s before it, written for this same defect.
+
+  ## Why the JVM here, and not nbb
+
+  The precedent runs the staged tree on nbb, and CLAUDE.md ranks nbb above the
+  JVM. This suite cannot follow it: the parity test compiles the Kotoba module
+  through `kotoba.compiler.core`, which amu publishes as `.clj` -- JVM-only.
+  Measured 2026-09-11: nbb cannot resolve that namespace at any classpath.
+  So the runner is nbb and the suite it starts is the JVM, and this paragraph
+  is here so the next reader does not spend the afternoon rediscovering it.
+
+  ## The floor
+
+  Refusing only on a run of ZERO leaves the more common regression open: a
+  suite that quietly drops from 15 tests to 1 still passes. The floor is the
+  count README.md publishes -- one place, the sentence readers already trust.
+
+  ## Exit contract
+
+    0  the suite ran, met the floor, and nothing failed
+    1  the suite ran and something failed or errored
+    2  REFUSED -- could not measure: no test sources, no namespaces, no floor
+       published, no summary line, or a run under the floor. Never a pass.
+
+  Usage:
+    nbb test/run_suite.cljs [--keep] [--lint]"
+  (:require ["node:fs" :as fs]
+            ["node:os" :as os]
+            ["node:path" :as path]
+            ["node:child_process" :as cp]
+            [nbb.core :refer [*file*]]
+            [clojure.string :as str]))
+
+(def argv (vec (drop 2 (js->clj js/process.argv))))
+(def keep? (some? (some #{"--keep"} argv)))
+(def lint? (some? (some #{"--lint"} argv)))
+
+(def repo-root (path/resolve (path/dirname (path/dirname *file*))))
+
+(def test-deps
+  "Kept in step with deps.edn's :test alias by `the-runner-and-deps-edn-agree`
+  below, so this is not a second pin that drifts."
+  (str "{:paths [\"%SRC%\"]"
+       " :aliases {:staged {:extra-paths [\"%TEST%\"]"
+       " :extra-deps {io.github.cognitect-labs/test-runner"
+       " {:git/tag \"v0.5.1\" :git/sha \"dfb30dd6605cb6c0efc275e1df1736f6e90d4d73\"}"
+       " io.github.kotoba-lang/amu"
+       " {:git/url \"https://github.com/kotoba-lang/amu.git\""
+       " :git/sha \"f5cf064366591ea729441b41143cc99e18e8239a\"}}}}}"))
+
+(defn- refuse [& msg]
+  (binding [*print-fn* *print-err-fn*] (apply println "REFUSED:" msg))
+  (js/process.exit 2))
+
+(defn- walk [dir]
+  (if-not (fs/existsSync dir)
+    []
+    (mapcat (fn [entry]
+              (let [full (path/join dir (.-name entry))]
+                (if (.isDirectory entry) (walk full) [full])))
+            (fs/readdirSync dir #js {:withFileTypes true}))))
+
+(def source-exts #{".kotoba" ".cljc" ".cljs" ".clj"})
+
+(defn- sources-under [rel]
+  (->> (walk (path/join repo-root rel))
+       (filter #(source-exts (path/extname %))) sort vec))
+
+(defn- kotoba-module?
+  "True for a file that is Kotoba, not Clojure wearing a Kotoba extension.
+  `(:export ...)` is a Kotoba ns clause and not a Clojure one, so it separates
+  the two without a filename convention. Staging the real module as `.cljc`
+  would put a file the Clojure reader cannot read onto the classpath -- and
+  the parity test slurps it from its own path anyway."
+  [file]
+  (str/includes? (fs/readFileSync file "utf8") "(:export"))
+
+(defn- ns-of [file]
+  (second (re-find #"\(ns\s+([A-Za-z0-9_.*+!?<>=$&%'|-]+)"
+                   (fs/readFileSync file "utf8"))))
+
+(defn- published-floor []
+  (let [readme (path/join repo-root "README.md")]
+    (when-not (fs/existsSync readme)
+      (refuse "README.md is missing, so there is no published count to hold the run to."))
+    (let [m (re-find #"(\d+)\s+tests?\s*/\s*(\d+)\s+assertions"
+                     (fs/readFileSync readme "utf8"))]
+      (when-not m
+        (refuse "README.md no longer states a `N tests / M assertions` claim."
+                "That sentence is the floor; without it a run of one test would pass."))
+      (let [floor {:tests (parse-long (nth m 1)) :assertions (parse-long (nth m 2))}]
+        (when (zero? (:tests floor))
+          (refuse "README.md publishes zero tests, which no run can fail to meet."))
+        floor))))
+
+(defn- stage!
+  "Copy each Clojure-shaped `.kotoba` source into a scratch tree.
+
+  `src/` is staged as `.cljc` and `test/` as `.clj`, which is what these files
+  actually are: the catalog is portable, and the parity test is not -- it
+  slurps files and drives amu's compiler, both JVM-only. Staging the tests as
+  `.cljc` made clj-kondo report `Unresolved symbol: slurp`, correctly: the
+  extension was claiming a portability the file does not have."
+  [scratch rel ext files]
+  (reduce (fn [n f]
+            (if (and (= ".kotoba" (path/extname f)) (not (kotoba-module? f)))
+              (let [relative (path/relative (path/join repo-root rel) f)
+                    target (path/join scratch rel (str/replace relative #"\.kotoba$" ext))]
+                (fs/mkdirSync (path/dirname target) #js {:recursive true})
+                (fs/copyFileSync f target)
+                (inc n))
+              n))
+          0 files))
+
+(defn- run-lint! [scratch]
+  (let [dirs (filterv fs/existsSync [(path/join scratch "src") (path/join scratch "test")])]
+    (when (empty? dirs) (refuse "nothing was staged, so there is nothing for clj-kondo to read."))
+    (let [res (cp/spawnSync
+               "clojure"
+               (clj->js (concat ["-Sdeps" "{:deps {clj-kondo/clj-kondo {:mvn/version \"2024.11.14\"}}}"
+                                 "-M" "-m" "clj-kondo.main" "--lint"]
+                                dirs ["--fail-level" "error"]))
+               #js {:encoding "utf8" :cwd repo-root})
+          out (str (.-stdout res) (.-stderr res))]
+      (println (str "LINT  " (str/join " " dirs)))
+      (println (str/trim out))
+      (let [m (re-find #"linting took .*errors: (\d+), warnings: (\d+)" out)]
+        (when-not m
+          (refuse "clj-kondo produced no summary line. The lint cannot be called clean."))
+        ;; `--fail-level error` is the setting this alias carried before the
+        ;; rename, under which errors failed the build and warnings did not.
+        ;; Restoring the reading restores the gate; reporting without it would
+        ;; leave the linter running and nothing acting on what it found.
+        (when (pos? (parse-long (nth m 1)))
+          (println "FAIL  clj-kondo reported" (nth m 1) "error(s)")
+          (js/process.exit 1))))))
+
+(defn -main []
+  (let [src-files (sources-under "src")
+        test-files (sources-under "test")
+        _ (when (empty? test-files)
+            (refuse "no test sources under test/ -- there is nothing to measure."))
+        test-nses (->> test-files (remove kotoba-module?) (keep ns-of)
+                       (filter #(str/ends-with? % "-test")) distinct vec)
+        _ (when (empty? test-nses)
+            (refuse (count test-files) "file(s) under test/ but none declares a *-test namespace."))
+        floor (published-floor)
+        scratch (fs/mkdtempSync (path/join (os/tmpdir) "tha-fti-suite-"))]
+    (try
+      (let [staged (+ (stage! scratch "src" ".cljc" src-files) (stage! scratch "test" ".clj" test-files))
+            _ (when (zero? staged)
+                (refuse "nothing was staged. Either the sources are already .clj*, in"
+                        "which case this runner is not what should be running them, or"
+                        "they were all read as Kotoba modules."))
+            sdeps (-> test-deps
+                      (str/replace "%SRC%" (path/join scratch "src"))
+                      (str/replace "%TEST%" (path/join scratch "test")))
+            res (cp/spawnSync "clojure"
+                              #js ["-Sdeps" sdeps "-M:staged"
+                                   "-m" "cognitect.test-runner"
+                                   "-d" (path/join scratch "test")]
+                              ;; cwd is the repository: the parity test slurps
+                              ;; the Kotoba module and both data files by their
+                              ;; real paths, and must read the working tree.
+                              #js {:encoding "utf8" :cwd repo-root})
+            out (str (.-stdout res) (.-stderr res))]
+        (println (str "SUITE src=" (count src-files) " test=" (count test-files)
+                      " staged=" staged " ns=" (str/join "," test-nses)))
+        (println (str "FLOOR README.md publishes " (:tests floor) " tests / "
+                      (:assertions floor) " assertions"))
+        (println (str/trim (str/replace out #"(?m)^WARNING.*\n?" "")))
+        (when (.-error res)
+          (refuse "could not start clojure:" (.-message (.-error res))))
+        (let [ran (re-find #"Ran (\d+) tests containing (\d+) assertions" out)
+              verdict (re-find #"(\d+) failures, (\d+) errors" out)]
+          (when-not (and ran verdict)
+            (refuse (str "the runner produced no test summary (exit " (.-status res)
+                         "). The run cannot be called a pass.")))
+          (let [tests (parse-long (nth ran 1)) assertions (parse-long (nth ran 2))
+                failures (parse-long (nth verdict 1)) errors (parse-long (nth verdict 2))]
+            (println (str "RAN   tests=" tests " assertions=" assertions
+                          " failures=" failures " errors=" errors))
+            (when (< tests (:tests floor))
+              (refuse (str "only " tests " of the " (:tests floor)
+                           " tests README.md publishes ran. The suite went dark;"
+                           " it did not pass.")))
+            (when (< assertions (:assertions floor))
+              (refuse (str "only " assertions " of the " (:assertions floor)
+                           " assertions README.md publishes ran.")))
+            (when lint? (run-lint! scratch))
+            (if (pos? (+ failures errors))
+              (do (println "FAIL") (js/process.exit 1))
+              (println "PASS")))))
+      (finally
+        (if keep?
+          (println (str "KEPT  " scratch))
+          (fs/rmSync scratch #js {:recursive true :force true}))))))
+
+(-main)

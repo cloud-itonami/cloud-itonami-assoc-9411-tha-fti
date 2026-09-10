@@ -1,0 +1,114 @@
+;; data/citation-evidence.edn — what was actually found on each cited page.
+;;
+;; A URL in a catalog is a decoration until something re-fetches it and looks
+;; for the sentence the entry claims is there. `:markers` is that sentence, as
+;; a verbatim substring of the bytes the page serves; every marker listed must
+;; still be present or scripts/verify_citations.cljs fails the entry.
+;;
+;; Markers are taken from the served bytes, not from rendered text. fti.or.th
+;; is a Next.js site and its longest prose — the founding history among it —
+;; lives in the __NEXT_DATA__ JSON rather than in the markup, which is why a
+;; reader that strips tags and reads the visible text concluded on 2026-07-17
+;; that the site "did not surface founding-history detail". Markers that would
+;; straddle an escape boundary inside that JSON (`\n`, `<`) are avoided:
+;; the ninth statutory objective is carried as "ปฏิบัติกิจการอื่น ๆ" and not as
+;; the full clause, because the full clause has a newline escape in the middle
+;; of it and would report a missing page when the page is fine.
+;;
+;; `:next-data-count` is for claims that are about a number of things rather
+;; than about a sentence. "Nine statutory objectives" cannot be evidenced by a
+;; substring — the page never writes the digit 9 — so it is evidenced by the
+;; length of the list the page serves. Without this the entry would say nine
+;; and nothing would check it.
+;;
+;; Verified 2026-09-11 by scripts/verify_citations.cljs: 20/20 entries,
+;; 12 distinct URLs, all HTTP 200.
+
+{"fti.predecessor-ati-1967-11-13"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["ก่อตั้งเมื่อวันที่ 13 พฤศจิกายน พ.ศ. 2510"
+            "The Association of Thai Industries"
+            "จำนวน 27 คน"]}
+
+ "fti.royal-gazette-act-1987-12-28"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["28 ธันวาคม พ.ศ. 2530"
+            "ในราชกิจจานุเบกษา"
+            "ภายใต้การกำกับของรัฐมนตรีว่าการกระทรวงอุตสาหกรรม"]}
+
+ "fti.founding-1987-12-29-upgrade"
+ {:url "https://en.wikipedia.org/wiki/Federation_of_Thai_Industries"
+  :markers ["29 December 1987" "13 November 1967"]}
+
+ "fti.legal-personality-act-be-2530"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["มีฐานะเป็นนิติบุคคล"
+            "พระราชบัญญัติสภาอุตสาหกรรมแห่งประเทศไทย พ.ศ. 2530"]}
+
+ "fti.statutory-objectives-nine"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["ปฏิบัติกิจการอื่น ๆ"]
+  :next-data-count {:path ["props" "pageProps" "backgroundPageData" "Background" "widget_3"]
+                    :expected 9}}
+
+ "fti.statutory-certification-power"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["ตรวจสอบสินค้า"]
+  :next-data-count {:path ["props" "pageProps" "backgroundPageData" "Background" "widget_3"]
+                    :expected 9}}
+
+ "fti.membership-two-classes"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["ประกอบด้วยสมาชิก 2 ประเภท" "ประเภทสามัญ" "ประเภทสมทบ"]}
+
+ "fti.industry-clubs-48"
+ {:url "https://fti.or.th/AboutUs/industrygroup"
+  :markers ["48 กลุ่มอุตสาหกรรม"]}
+
+ "fti.provincial-industrial-councils-76"
+ {:url "https://fti.or.th/AboutUs/industrialcouncil"
+  :markers [">76<" "สมาชิกสภาอุตสาหกรรม"]}
+
+ "fti.jsccib-tripartite-seat"
+ {:url "https://fti.or.th/AboutUs/background"
+  :markers ["คณะกรรมการร่วม 3 สถาบันภาคเอกชน"]}
+
+ "fti.bilateral-business-councils-19"
+ {:url "https://fti.or.th/AboutUs/businesscouncil"
+  :markers ["จำนวน 19 สภาธุรกิจ" "กำกับดูแลอยู่ 9 สภาธุรกิจ"]}
+
+ "fti.certificate-of-origin-service"
+ {:url "https://fti.or.th/Serve/certification"
+  :markers ["ออกหนังสือรับรองแหล่งกำเนิดสินค้า"]}
+
+ "fti.made-in-thailand-certification"
+ {:url "https://mit.fti.or.th/"
+  :markers ["Made in Thailand"]}
+
+ "fti.apec-business-travel-card"
+ {:url "https://fti.or.th/Serve/certification"
+  :markers ["APEC" "19 เขตเศรษฐกิจ"]}
+
+ "fti.boi-production-formula-section-36"
+ {:url "https://fti.or.th/Serve/certification"
+  :markers ["มาตรา 36"]}
+
+ "fti.quality-policy-published"
+ {:url "https://fti.or.th/AboutUs/qualitypolicy"
+  :markers ["นโยบายคุณภาพ"]}
+
+ "fti.annual-reports-published"
+ {:url "https://fti.or.th/AboutUs/annualreports"
+  :markers ["รายงานประจำปี" "2563 - 2568"]}
+
+ "fti.departments-four-groups"
+ {:url "https://fti.or.th/AboutUs/DepartmentsUnderFTI"
+  :markers ["กลุ่มที่ 4" "สถาบันรหัสสากล (GS1)"]}
+
+ "fti.administration-term-2569-2571"
+ {:url "https://fti.or.th/AboutUs/structureadministration"
+  :markers ["2569 - 2571"]}
+
+ "fti.head-office-bangkok"
+ {:url "https://fti.or.th/ContactUs/contactchannel"
+  :markers ["ถ. นางลิ้นจี่" "10120"]}}

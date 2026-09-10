@@ -1,17 +1,44 @@
 {:paths ["src"]
  :aliases
- {:test {:extra-paths ["test"]
-         ;; amu is TEST-ONLY, for the catalog parity gate: it compiles
-         ;; `src/association_facts.kotoba` and runs it against the `.cljc` that
-         ;; reads the same `data/datascript-tx.edn`. Nothing at runtime compiles.
+ {;; This alias no longer runs the suite -- it refuses, loudly.
+  ;;
+  ;; The suite lives in `.kotoba` files (34daed3, an owner-instructed rename
+  ;; that changed no contents). `clojure.tools.namespace` does not scan that
+  ;; extension and `cognitect.test-runner` uses it to find tests, so from that
+  ;; commit `clojure -M:test` reported `Ran 0 tests containing 0 assertions.
+  ;; 0 failures, 0 errors.` and exited 0 -- the same value it had reported the
+  ;; commit before, when it ran 10 tests. A check that could not run returned
+  ;; what a check that ran and passed returns.
+  ;;
+  ;; It is left pointed at src/test because that is where the sources will be
+  ;; again if the rename is reverted, and it refuses in the meantime rather
+  ;; than reporting clean. The working command stages the sources first:
+  ;;
+  ;;     nbb test/run_suite.cljs
+  ;;
+  ;; That runner starts a JVM with the pins below; they are the real pins and
+  ;; test/run_suite.cljs carries a copy, which the suite itself checks are
+  ;; equal (`the-runner-and-deps-edn-agree`).
+  ;;
+  ;; amu is TEST-ONLY, for the catalog parity gate: it compiles
+  ;; `src/association_facts.kotoba` and runs it against the Clojure reading of
+  ;; the same `data/datascript-tx.edn`. Nothing at runtime compiles.
+  :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd6605cb6c0efc275e1df1736f6e90d4d73"}
                       io.github.kotoba-lang/amu
                       {:git/url "https://github.com/kotoba-lang/amu.git"
                        :git/sha "f5cf064366591ea729441b41143cc99e18e8239a"}}
-         :main-opts ["-m" "cognitect.test-runner"]
-         :exec-fn cognitect.test-runner.api/test}
+         :main-opts
+         ["-e"
+          "(binding [*out* *err*] (println \"REFUSED: cognitect.test-runner does not scan .kotoba, so this alias would collect zero tests and report `Ran 0 tests`. Run: nbb test/run_suite.cljs\")) (System/exit 2)"]}
+
+  ;; Same defect, same shape: clj-kondo does not read `.kotoba` either, so this
+  ;; alias went from linting two files to `errors: 0, warnings: 0` in a few
+  ;; milliseconds -- a check that inspected nothing returning what a clean
+  ;; check returns. The working command is `nbb test/run_suite.cljs --lint`,
+  ;; which points the linter at the staged tree.
   :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
-         :main-opts    ["-m" "clj-kondo.main"
-                        "--lint" "src" "test"
-                        "--fail-level" "error"]}}}
+         :main-opts
+         ["-e"
+          "(binding [*out* *err*] (println \"REFUSED: clj-kondo does not read .kotoba, so this alias would lint zero files and report `errors: 0, warnings: 0`. Run: nbb test/run_suite.cljs --lint\")) (System/exit 2)"]}}}
