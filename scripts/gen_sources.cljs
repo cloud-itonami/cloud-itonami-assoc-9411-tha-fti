@@ -1,0 +1,257 @@
+#!/usr/bin/env nbb
+(ns gen-sources
+  "Write the two derived readings of the catalog from data/datascript-tx.edn.
+
+  The catalog exists three times: as tx-data (the source of truth), as a
+  Clojure-shaped literal map that `association.facts` serves, and as a Kotoba
+  module that reaches the oracle, wasm and both native ISAs. Three hand-kept
+  copies of twenty entries is a transcription accident waiting to happen —
+  before 2026-09-11 there were two entries and the port was written by hand,
+  which was survivable; at twenty it is not.
+
+  So the two readings are generated here and the parity suite still compares
+  them field by field. The generator is not a substitute for that suite: a
+  generator with a bug produces two files that agree with each other, and only
+  a check that executes the Kotoba module through the compiler can tell that
+  the module answers what the map holds.
+
+  Refuses rather than emitting anything it cannot emit faithfully. The string
+  escape in particular: the Kotoba port carries these titles as string
+  literals, and a title with a quote or a non-ASCII character in it would
+  either break the module or change meaning between the two files. Neither is
+  allowed to pass silently.
+
+  Exit contract:
+    0  both files written (or already up to date under --check)
+    1  --check and a file is out of date
+    2  REFUSED — the input is missing, malformed, or holds something that
+       cannot be emitted faithfully
+
+  Usage:
+    nbb scripts/gen_sources.cljs [--check]"
+  (:require ["node:fs" :as fs]
+            ["node:path" :as path]
+            [nbb.core :refer [*file*]]
+            [clojure.edn :as edn]
+            [clojure.string :as str]))
+
+(def argv (vec (drop 2 (js->clj js/process.argv))))
+(def check? (some? (some #{"--check"} argv)))
+(def repo-root (path/resolve (path/dirname (path/dirname *file*))))
+
+(defn- refuse [& msg]
+  (binding [*print-fn* *print-err-fn*] (apply println "REFUSED:" msg))
+  (js/process.exit 2))
+
+(def catalog
+  (let [p (path/join repo-root "data/datascript-tx.edn")]
+    (when-not (fs/existsSync p) (refuse "data/datascript-tx.edn is missing."))
+    (let [v (edn/read-string (fs/readFileSync p "utf8"))]
+      (when-not (vector? v)
+        (refuse "data/datascript-tx.edn read as a" (str (type v)) "not a vector."))
+      (when (empty? v) (refuse "data/datascript-tx.edn holds no entries."))
+      v)))
+
+(def slug
+  (let [s (distinct (map :association-rule/association catalog))]
+    (when-not (= 1 (count s))
+      (refuse "this generator emits one association; the catalog names" (str/join ", " s)))
+    (first s)))
+
+(def fields
+  "The field order both readings use. `established-date` and
+  `last-revised-date` are optional; an entry without one emits no clause for
+  it, so the port answers none and the parity suite compares nil to nil."
+  ["id" "title" "association" "isic" "country" "kind" "url" "url-provenance"
+   "established-date" "last-revised-date" "retrieved-at"])
+
+(def field->key
+  (into {} (map (fn [f] [f (keyword "association-rule" f)]) fields)))
+
+(defn- lit
+  "A Kotoba string literal, or a refusal. Anything that would need escaping is
+  refused instead of escaped: this catalog has no such value today, and a
+  generator that quietly invents an escape is the shape that makes two files
+  disagree about what a title says."
+  [id field s]
+  (let [s (str s)]
+    (when (str/includes? s "\"")
+      (refuse "entry" id "field" field "contains a double quote, which this generator will not escape."))
+    (when (str/includes? s "\\")
+      (refuse "entry" id "field" field "contains a backslash, which this generator will not escape."))
+    (when (re-find #"[\r\n\t]" s)
+      (refuse "entry" id "field" field "contains a newline or tab."))
+    (when (some #(> (.charCodeAt % 0) 127) s)
+      (refuse "entry" id "field" field "is not ASCII:" (pr-str s)
+              "-- the Kotoba port carries these as literals and this generator"
+              "will not risk them changing meaning across backends."))
+    (str "\"" s "\"")))
+
+(defn- value-of [e f]
+  (let [v (get e (field->key f))]
+    (cond (nil? v) nil (keyword? v) (name v) (string? v) v
+          :else (refuse "entry" (:association-rule/id e) "field" f
+                        "is a" (str (type v)) "which has no string reading."))))
+
+(def topics-of (fn [e] (mapv name (:association-rule/topic e))))
+
+(def all-topics (vec (distinct (mapcat topics-of catalog))))
+
+(defn- some-str [s] (str "(option-some-of [:option :string] " s ")"))
+(def none-str "(option-none-of [:option :string])")
+
+(defn- entry-field-clause [i e]
+  (let [id (:association-rule/id e)
+        pairs (keep (fn [f] (when-let [v (value-of e f)]
+                              (str "        (string=? f " (lit id f f) ") "
+                                   (some-str (lit id f v)))))
+                    fields)]
+    (str "      (= i " i ")\n      (cond\n"
+         (str/join "\n" pairs)
+         "\n        :else " none-str ")")))
+
+(defn- topic-clause [i e]
+  (let [ts (topics-of e)
+        id (:association-rule/id e)]
+    (str "      (= i " i ")\n      (cond\n"
+         (str/join "\n" (map-indexed (fn [t nm] (str "        (= t " t ") "
+                                                     (some-str (lit id "topic" nm)))) ts))
+         "\n        :else " none-str ")")))
+
+(defn- by-topic-id-clause [topic]
+  (let [idxs (keep-indexed (fn [i e] (when (some #{topic} (topics-of e)) i)) catalog)]
+    (str "      (string=? candidate " (lit "-" "topic" topic) ")\n      (cond\n"
+         (str/join "\n" (map-indexed (fn [n i] (str "        (= i " n ") (entry-field a " i " \"id\")")) idxs))
+         "\n        :else " none-str ")")))
+
+(defn- kotoba-port []
+  (str
+   ";; The " (str/upper-case slug) " source catalog, as Kotoba.\n"
+   ";;\n"
+   ";; GENERATED by scripts/gen_sources.cljs from data/datascript-tx.edn.\n"
+   ";; Do not edit: run the generator.\n"
+   ";;\n"
+   ";; `:topic` is a SET in the schema but a VECTOR in the data file, and\n"
+   ";; `topic` is indexed by position, so the written order is the order. That\n"
+   ";; is why the data file is the source of truth and not the literal map:\n"
+   ";; a set has no order to transcribe. `by-topic-id` answers by name and is\n"
+   ";; unaffected.\n"
+   ";;\n"
+   ";; Parity: test/association_facts_kotoba_parity_test.kotoba executes this\n"
+   ";; module through the compiler and compares every field of every entry\n"
+   ";; against the map `association.facts` serves, so a generator bug that\n"
+   ";; wrote self-consistent nonsense would still be caught.\n\n"
+   "(ns association-facts\n"
+   "  (:export [main association-covered? entry-count entry-field topic-count\n"
+   "            topic by-topic-count by-topic-id coverage-note]))\n\n"
+   "(defn association-covered? [a :string] :bool (string=? a " (lit "-" "slug" slug) "))\n\n"
+   "(defn entry-count [a :string] :i64 (if (association-covered? a) " (count catalog) " 0))\n\n"
+   "(defn valid-entry? [a :string i :i64] :bool\n"
+   "  (if (association-covered? a) (if (< i 0) false (< i " (count catalog) ")) false))\n\n"
+   "(defn entry-field [a :string i :i64 f :string] [:option :string]\n"
+   "  (if (valid-entry? a i)\n    (cond\n"
+   (str/join "\n" (map-indexed entry-field-clause catalog))
+   "\n      :else " none-str ")\n    " none-str "))\n\n"
+   "(defn topic-count [a :string i :i64] :i64\n"
+   "  (if (valid-entry? a i)\n    (cond\n"
+   (str/join "\n" (map-indexed (fn [i e] (str "      (= i " i ") " (count (topics-of e)))) catalog))
+   "\n      :else 0)\n    0))\n\n"
+   "(defn topic [a :string i :i64 t :i64] [:option :string]\n"
+   "  (if (valid-entry? a i)\n    (cond\n"
+   (str/join "\n" (map-indexed topic-clause catalog))
+   "\n      :else " none-str ")\n    " none-str "))\n\n"
+   "(defn by-topic-count [a :string candidate :string] :i64\n"
+   "  (if (association-covered? a)\n    (cond\n"
+   (str/join "\n" (map (fn [t] (str "      (string=? candidate " (lit "-" "topic" t) ") "
+                                    (count (filter #(some #{t} (topics-of %)) catalog))))
+                       all-topics))
+   "\n      :else 0)\n    0))\n\n"
+   "(defn by-topic-id [a :string candidate :string i :i64] [:option :string]\n"
+   "  (if (association-covered? a)\n    (cond\n"
+   (str/join "\n" (map by-topic-id-clause all-topics))
+   "\n      :else " none-str ")\n    " none-str "))\n\n"
+   "(defn coverage-note [a :string] [:option :string]\n"
+   "  (if (association-covered? a)\n    "
+   (some-str (lit "-" "note" (str "cloud-itonami-assoc-9411-tha-fti (ADR-2607141700): "
+                                  (count catalog) " " slug " entries, "
+                                  (count (filter #(= :official (:association-rule/url-provenance %)) catalog))
+                                  " of them cited to the federation's own domain. "
+                                  "Extend the catalog; never fabricate a rule id/url.")))
+   "\n    " none-str "))\n\n"
+   "(defn main [] :i64 0)\n"))
+
+(defn- entry-map [e]
+  (let [id (:association-rule/id e)
+        pad "    "]
+    (str "{" (str/join (str "\n" pad " ")
+                       (concat
+                        (keep (fn [f]
+                                (when-let [v (get e (field->key f))]
+                                  (str ":association-rule/" f " "
+                                       (if (keyword? v) (str v) (pr-str v)))))
+                              fields)
+                        [(str ":association-rule/topic #{"
+                              (str/join " " (map #(str ":" %) (topics-of e))) "}")]))
+         "}")))
+
+(defn- clojure-catalog []
+  (str
+   "(ns association.facts\n"
+   "  \"Industry rule/history catalog for the Federation of Thai Industries\n"
+   "  (FTI), ISIC 9411, per ADR-2607141700\n"
+   "  (cloud-itonami-compliance-fact-federation).\n\n"
+   "  GENERATED by scripts/gen_sources.cljs from data/datascript-tx.edn, which\n"
+   "  is the source of truth. Do not edit: run the generator.\n\n"
+   "  Of the " (count catalog) " entries, "
+   (count (filter #(= :official (:association-rule/url-provenance %)) catalog))
+   " are cited to fti.or.th or mit.fti.or.th --\n"
+   "  the federation's own domains -- and the rest to en.wikipedia.org. Every\n"
+   "  citation carries the substring it claims is on the page, recorded in\n"
+   "  data/citation-evidence.edn and re-fetched by\n"
+   "  scripts/verify_citations.cljs, because an HTTP 200 is returned by a page\n"
+   "  that has been rewritten, emptied, or replaced by a login wall just as\n"
+   "  readily as by the page the entry was written against.\n\n"
+   "  An association not in `catalog` has NO spec-basis, full stop; never\n"
+   "  fabricate one.\")\n\n"
+   "(def catalog\n"
+   "  \"association-slug -> vector of association-rule entries.\"\n"
+   "  {" (pr-str slug) "\n   [" (str/join "\n    " (map entry-map catalog)) "]})\n\n"
+   "(defn spec-basis [association] (get catalog association))\n\n"
+   "(defn coverage\n"
+   "  ([] (coverage (keys catalog)))\n"
+   "  ([associations]\n"
+   "   (let [have (filter catalog associations)\n"
+   "         missing (remove catalog associations)]\n"
+   "     {:requested (count associations)\n"
+   "      :covered (count have)\n"
+   "      :covered-associations (vec (sort have))\n"
+   "      :missing-associations (vec (sort missing))\n"
+   "      :note (str \"cloud-itonami-assoc-9411-tha-fti (ADR-2607141700): \"\n"
+   "                 (count (get catalog " (pr-str slug) ")) \" FTI entries, \"\n"
+   "                 (count (filter #(= :official (:association-rule/url-provenance %))\n"
+   "                                (get catalog " (pr-str slug) ")))\n"
+   "                 \" of them cited to the federation's own domain. \"\n"
+   "                 \"Extend `association.facts/catalog` via data/datascript-tx.edn, \"\n"
+   "                 \"never fabricate an id/url.\")})))\n\n"
+   "(defn by-topic [association topic]\n"
+   "  (filterv #(contains? (:association-rule/topic %) topic) (spec-basis association)))\n"))
+
+(defn- emit! [rel content]
+  (let [p (path/join repo-root rel)
+        current (when (fs/existsSync p) (fs/readFileSync p "utf8"))]
+    (cond
+      (= current content) (do (println (str "SAME  " rel)) true)
+      check? (do (println (str "STALE " rel)) false)
+      :else (do (fs/writeFileSync p content) (println (str "WROTE " rel)) true))))
+
+(defn -main []
+  (println (str "GEN   slug=" slug " entries=" (count catalog)
+                " topics=" (str/join "," all-topics)))
+  (let [ok (doall [(emit! "src/association/facts.kotoba" (clojure-catalog))
+                   (emit! "src/association_facts.kotoba" (kotoba-port))])]
+    (when (some false? ok)
+      (println "FAIL  run `nbb scripts/gen_sources.cljs` and commit the result")
+      (js/process.exit 1))
+    (println "PASS")))
+
+(-main)

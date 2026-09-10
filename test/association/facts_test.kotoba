@@ -1,12 +1,36 @@
 (ns association.facts-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
             [association.facts :as facts]))
 
 (deftest fti-has-spec-basis
   (let [sb (facts/spec-basis "fti")]
-    (is (= 2 (count sb)))
+    (is (= 20 (count sb)))
     (is (every? #(= "9411" (:association-rule/isic %)) sb))
     (is (every? #(= "THA" (:association-rule/country %)) sb))))
+
+(deftest every-entry-is-identified-and-cited
+  (let [sb (facts/spec-basis "fti")]
+    (is (= (count sb) (count (distinct (map :association-rule/id sb))))
+        "duplicate ids would collide on :db.unique/identity in DataScript")
+    (is (every? #(re-matches #"https://[^\s]+" (:association-rule/url %)) sb))
+    (is (every? #(seq (:association-rule/topic %)) sb)
+        "an entry with no topic is reachable by no query")))
+
+(deftest provenance-is-recorded-not-assumed
+  ;; The catalog was seeded from en.wikipedia.org because a check concluded
+  ;; fti.or.th carried no founding history. It does. What keeps that from
+  ;; being re-litigated by memory is that each entry says where it came from.
+  (let [sb (facts/spec-basis "fti")
+        by-prov (frequencies (map :association-rule/url-provenance sb))]
+    (is (every? #{:official :wikipedia-corroborated}
+                (map :association-rule/url-provenance sb)))
+    (is (pos? (:official by-prov 0)))
+    (is (every? #(re-find #"(^|\.)fti\.or\.th$" (-> (:association-rule/url %)
+                                                    (str/replace #"^https://" "")
+                                                    (str/replace #"/.*$" "")))
+                (filter #(= :official (:association-rule/url-provenance %)) sb))
+        ":official must mean the federation's own domain, not merely a good source")))
 
 (deftest unknown-association-has-no-spec-basis
   (is (nil? (facts/spec-basis "ibec")))
@@ -16,9 +40,17 @@
   (let [c (facts/coverage ["fti" "ibec"])]
     (is (= 2 (:requested c)))
     (is (= 1 (:covered c)))
-    (is (= ["ibec"] (:missing-associations c)))))
+    (is (= ["ibec"] (:missing-associations c)))
+    (is (re-find #"\b20 FTI entries\b" (:note c))
+        "the note states the count, so a catalog that shrank says so")))
 
 (deftest by-topic-filters
-  (is (= 2 (count (facts/by-topic "fti" :governance))))
-  (is (empty? (facts/by-topic "fti" :labor)))
-  (is (empty? (facts/by-topic "ibec" :governance))))
+  (testing "a topic several entries carry"
+    (is (= (count (filter #(contains? (:association-rule/topic %) :governance)
+                          (facts/spec-basis "fti")))
+           (count (facts/by-topic "fti" :governance))))
+    (is (pos? (count (facts/by-topic "fti" :governance)))))
+  (testing "a topic no entry carries"
+    (is (empty? (facts/by-topic "fti" :labor))))
+  (testing "an association the catalog does not cover"
+    (is (empty? (facts/by-topic "ibec" :governance)))))
