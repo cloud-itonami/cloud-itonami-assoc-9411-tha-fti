@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns gen-sources
   "Write the two derived readings of the catalog from data/datascript-tx.edn.
 
@@ -28,7 +28,7 @@
        cannot be emitted faithfully
 
   Usage:
-    nbb scripts/gen_sources.cljk [--check]"
+    kbb --backend sci scripts/gen_sources.cljk [--check]"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             [nbb.core :refer [*file*]]
@@ -250,7 +250,7 @@
   (let [ok (doall [(emit! "src/association/facts.kotoba" (clojure-catalog))
                    (emit! "src/association_facts.kotoba" (kotoba-port))])]
     (when (some false? ok)
-      (println "FAIL  run `nbb scripts/gen_sources.cljk` and commit the result")
+      (println "FAIL  run `kbb --backend sci scripts/gen_sources.cljk` and commit the result")
       (js/process.exit 1))
     (println "PASS")))
 
