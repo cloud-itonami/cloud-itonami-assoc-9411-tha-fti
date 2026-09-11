@@ -33,4 +33,4 @@
   strips tags and looks at the visible text sees the headings and not the
   history. 19 of the 20 catalog entries are now cited to fti.or.th or
   mit.fti.or.th; see data/citation-evidence.edn for the substring each one
-  claims, and scripts/verify_citations.cljs for the check that demands it back."}
+  claims, and scripts/verify_citations.cljk for the check that demands it back."}

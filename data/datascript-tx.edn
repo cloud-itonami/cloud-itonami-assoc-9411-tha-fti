@@ -19,7 +19,7 @@
 ;; __NEXT_DATA__ payload rather than in the rendered markup, so a reader that
 ;; strips tags and looks at the visible text alone sees the headings and not
 ;; the history. Every entry below carries the marker string that was found on
-;; the page it cites; scripts/verify_citations.cljs re-fetches each URL and
+;; the page it cites; scripts/verify_citations.cljk re-fetches each URL and
 ;; refuses unless the marker is still there.
 ;;
 ;; The one-day disagreement between the Royal Gazette date FTI publishes

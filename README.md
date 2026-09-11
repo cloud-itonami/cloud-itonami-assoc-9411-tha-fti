@@ -64,9 +64,9 @@ is reported honestly (`association.facts/coverage`): an association not in
 | `src/association/facts.kotoba` | Clojure reading — **generated** |
 | `src/association_facts.kotoba` | Kotoba port — **generated** |
 | `schema/association-rule.edn` | DataScript schema |
-| `scripts/gen_sources.cljs` | writes both generated readings |
-| `scripts/verify_citations.cljs` | re-fetches every URL and demands its markers back |
-| `test/run_suite.cljs` | runs the suite (see below) |
+| `scripts/gen_sources.cljk` | writes both generated readings |
+| `scripts/verify_citations.cljk` | re-fetches every URL and demands its markers back |
+| `test/run_suite.cljk` | runs the suite (see below) |
 
 Query it alongside the other `cloud-itonami`/`etzhayyim` compliance-fact
 sources via `com-junkawasaki/root`'s `scripts/compliance-fact-query.cljs`.
@@ -74,9 +74,9 @@ sources via `com-junkawasaki/root`'s `scripts/compliance-fact-query.cljs`.
 ## Running the checks
 
 ```bash
-nbb scripts/gen_sources.cljs --check    # the generated readings are current
-nbb test/run_suite.cljs                 # 16 tests / 693 assertions
-nbb scripts/verify_citations.cljs       # 20 entries, 12 URLs, all HTTP 200
+nbb scripts/gen_sources.cljk --check    # the generated readings are current
+nbb test/run_suite.cljk                 # 16 tests / 693 assertions
+nbb scripts/verify_citations.cljk       # 20 entries, 12 URLs, all HTTP 200
 ```
 
 **`clojure -M:test` and `clojure -M:lint` refuse (exit 2) and will not run
@@ -86,7 +86,7 @@ to `.kotoba` (34daed3) changed no file contents, but `clojure.tools.namespace`
 does not scan that extension, so `cognitect.test-runner` collected nothing
 and reported `Ran 0 tests containing 0 assertions. 0 failures, 0 errors.` with
 **exit 0** — byte-identical in shape to the run that passed 10 tests the
-commit before. clj-kondo did the same thing to `:lint`. `test/run_suite.cljs`
+commit before. clj-kondo did the same thing to `:lint`. `test/run_suite.cljk`
 stages the `.kotoba` sources into a scratch tree under `.cljc` and runs them
 there; it holds the run to the counts published in the line above, and
 refuses (exit 2, never a pass) if fewer tests run than that.
@@ -106,9 +106,9 @@ readings are written from it.
 
 ```bash
 $EDITOR data/datascript-tx.edn data/citation-evidence.edn
-nbb scripts/gen_sources.cljs
-nbb scripts/verify_citations.cljs
-nbb test/run_suite.cljs
+nbb scripts/gen_sources.cljk
+nbb scripts/verify_citations.cljk
+nbb test/run_suite.cljk
 ```
 
 The suite compares the generated map against the data file, so forgetting to

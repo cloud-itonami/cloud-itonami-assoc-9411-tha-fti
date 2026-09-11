@@ -3,7 +3,7 @@
 ;; A URL in a catalog is a decoration until something re-fetches it and looks
 ;; for the sentence the entry claims is there. `:markers` is that sentence, as
 ;; a verbatim substring of the bytes the page serves; every marker listed must
-;; still be present or scripts/verify_citations.cljs fails the entry.
+;; still be present or scripts/verify_citations.cljk fails the entry.
 ;;
 ;; Markers are taken from the served bytes, not from rendered text. fti.or.th
 ;; is a Next.js site and its longest prose — the founding history among it —
@@ -21,7 +21,7 @@
 ;; length of the list the page serves. Without this the entry would say nine
 ;; and nothing would check it.
 ;;
-;; Verified 2026-09-11 by scripts/verify_citations.cljs: 20/20 entries,
+;; Verified 2026-09-11 by scripts/verify_citations.cljk: 20/20 entries,
 ;; 12 distinct URLs, all HTTP 200.
 
 {"fti.predecessor-ati-1967-11-13"
