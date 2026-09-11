@@ -29,7 +29,7 @@
        between the two files. Never a pass.
 
   Usage:
-    nbb scripts/verify_citations.cljs [--only <entry-id>] [--timeout-ms N]"
+    nbb scripts/verify_citations.cljk [--only <entry-id>] [--timeout-ms N]"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             [nbb.core :refer [*file*]]

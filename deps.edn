@@ -14,10 +14,10 @@
   ;; again if the rename is reverted, and it refuses in the meantime rather
   ;; than reporting clean. The working command stages the sources first:
   ;;
-  ;;     nbb test/run_suite.cljs
+  ;;     nbb test/run_suite.cljk
   ;;
   ;; That runner starts a JVM with the pins below; they are the real pins and
-  ;; test/run_suite.cljs carries a copy, which the suite itself checks are
+  ;; test/run_suite.cljk carries a copy, which the suite itself checks are
   ;; equal (`the-runner-and-deps-edn-agree`).
   ;;
   ;; amu is TEST-ONLY, for the catalog parity gate: it compiles
@@ -31,14 +31,14 @@
                        :git/sha "f5cf064366591ea729441b41143cc99e18e8239a"}}
          :main-opts
          ["-e"
-          "(binding [*out* *err*] (println \"REFUSED: cognitect.test-runner does not scan .kotoba, so this alias would collect zero tests and report `Ran 0 tests`. Run: nbb test/run_suite.cljs\")) (System/exit 2)"]}
+          "(binding [*out* *err*] (println \"REFUSED: cognitect.test-runner does not scan .kotoba, so this alias would collect zero tests and report `Ran 0 tests`. Run: nbb test/run_suite.cljk\")) (System/exit 2)"]}
 
   ;; Same defect, same shape: clj-kondo does not read `.kotoba` either, so this
   ;; alias went from linting two files to `errors: 0, warnings: 0` in a few
   ;; milliseconds -- a check that inspected nothing returning what a clean
-  ;; check returns. The working command is `nbb test/run_suite.cljs --lint`,
+  ;; check returns. The working command is `nbb test/run_suite.cljk --lint`,
   ;; which points the linter at the staged tree.
   :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
          :main-opts
          ["-e"
-          "(binding [*out* *err*] (println \"REFUSED: clj-kondo does not read .kotoba, so this alias would lint zero files and report `errors: 0, warnings: 0`. Run: nbb test/run_suite.cljs --lint\")) (System/exit 2)"]}}}
+          "(binding [*out* *err*] (println \"REFUSED: clj-kondo does not read .kotoba, so this alias would lint zero files and report `errors: 0, warnings: 0`. Run: nbb test/run_suite.cljk --lint\")) (System/exit 2)"]}}}

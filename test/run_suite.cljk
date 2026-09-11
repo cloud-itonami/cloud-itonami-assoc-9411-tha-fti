@@ -20,7 +20,7 @@
   The catalog parity gate -- the whole reason a twenty-entry catalog written
   three times is safe to keep -- was checked by no one in between.
 
-  Modeled on `orgs/cloud-itonami/cloud-itonami-isco-3117`'s test/run_suite.cljs
+  Modeled on `orgs/cloud-itonami/cloud-itonami-isco-3117`'s test/run_suite.cljk
   and `-isco-2519`'s before it, written for this same defect.
 
   ## Why the JVM here, and not nbb
@@ -46,7 +46,7 @@
        published, no summary line, or a run under the floor. Never a pass.
 
   Usage:
-    nbb test/run_suite.cljs [--keep] [--lint]"
+    nbb test/run_suite.cljk [--keep] [--lint]"
   (:require ["node:fs" :as fs]
             ["node:os" :as os]
             ["node:path" :as path]
