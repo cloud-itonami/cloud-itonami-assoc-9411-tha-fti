@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-citations
   "Re-fetch every URL this catalog cites and check the sentence is still there.
 
@@ -29,7 +29,7 @@
        between the two files. Never a pass.
 
   Usage:
-    nbb scripts/verify_citations.cljk [--only <entry-id>] [--timeout-ms N]"
+    kbb --backend sci scripts/verify_citations.cljk [--only <entry-id>] [--timeout-ms N]"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             [nbb.core :refer [*file*]]

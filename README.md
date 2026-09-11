@@ -74,12 +74,12 @@ sources via `com-junkawasaki/root`'s `scripts/compliance-fact-query.cljs`.
 ## Running the checks
 
 ```bash
-nbb scripts/gen_sources.cljk --check    # the generated readings are current
-nbb test/run_suite.cljk                 # 16 tests / 693 assertions
-nbb scripts/verify_citations.cljk       # 20 entries, 12 URLs, all HTTP 200
+kbb --backend sci scripts/gen_sources.cljk --check    # the generated readings are current
+kbb --backend sci test/run_suite.cljk                 # 16 tests / 693 assertions
+kbb --backend sci scripts/verify_citations.cljk       # 20 entries, 12 URLs, all HTTP 200
 ```
 
-**`clojure -M:test` and `clojure -M:lint` refuse (exit 2) and will not run
+**`kbb -M:test` and `kbb -M:lint` refuse (exit 2) and will not run
 the suite.** They are not broken by neglect — they are pointed at a defect
 that would otherwise be silent. The 2026-09-10 rename of every Clojure source
 to `.kotoba` (34daed3) changed no file contents, but `clojure.tools.namespace`
@@ -106,9 +106,9 @@ readings are written from it.
 
 ```bash
 $EDITOR data/datascript-tx.edn data/citation-evidence.edn
-nbb scripts/gen_sources.cljk
-nbb scripts/verify_citations.cljk
-nbb test/run_suite.cljk
+kbb --backend sci scripts/gen_sources.cljk
+kbb --backend sci scripts/verify_citations.cljk
+kbb --backend sci test/run_suite.cljk
 ```
 
 The suite compares the generated map against the data file, so forgetting to

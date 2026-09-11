@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns run-suite
   "Execute this repository's suite and report how many tests actually ran.
 
@@ -10,7 +10,7 @@
   uses to find tests, so from that commit onward the documented command
   reported:
 
-      $ clojure -M:test
+      $ kbb -M:test
       Ran 0 tests containing 0 assertions.
       0 failures, 0 errors.                       exit 0
 
@@ -46,7 +46,7 @@
        published, no summary line, or a run under the floor. Never a pass.
 
   Usage:
-    nbb test/run_suite.cljk [--keep] [--lint]"
+    kbb --backend sci test/run_suite.cljk [--keep] [--lint]"
   (:require ["node:fs" :as fs]
             ["node:os" :as os]
             ["node:path" :as path]
