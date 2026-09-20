@@ -83,7 +83,7 @@
                 (if (.isDirectory entry) (walk full) [full])))
             (fs/readdirSync dir #js {:withFileTypes true}))))
 
-(def source-exts #{".kotoba" ".cljc" ".cljs" ".clj"})
+(def source-exts #{".kotoba" ".cljk" ".cljc" ".clj"})
 
 (defn- sources-under [rel]
   (->> (walk (path/join repo-root rel))
