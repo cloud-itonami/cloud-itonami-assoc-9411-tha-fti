@@ -33,7 +33,7 @@
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             [nbb.core :refer [*file*]]
-            [clojure.edn :as edn]
+            [kotoba.lang.edn :as edn]
             [clojure.string :as str]))
 
 (def argv (vec (drop 2 (js->clj js/process.argv))))
