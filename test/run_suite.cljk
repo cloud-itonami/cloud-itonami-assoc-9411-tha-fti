@@ -16,7 +16,7 @@
 
   One commit earlier the same command reported 10 tests / 60 assertions --
   also exit 0. **A suite that could not run returned the same value as a suite
-  that ran and passed.** That is questions 2 and 4 of the eight in CLAUDE.md.
+  that ran and passed.** That is questions 2 and 4 of the eight in AGENTS.md.
   The catalog parity gate -- the whole reason a twenty-entry catalog written
   three times is safe to keep -- was checked by no one in between.
 
@@ -25,7 +25,7 @@
 
   ## Why the JVM here, and not nbb
 
-  The precedent runs the staged tree on nbb, and CLAUDE.md ranks nbb above the
+  The precedent runs the staged tree on nbb, and AGENTS.md ranks nbb above the
   JVM. This suite cannot follow it: the parity test compiles the Kotoba module
   through `kotoba.compiler.core`, which amu publishes as `.clj` -- JVM-only.
   Measured 2026-09-11: nbb cannot resolve that namespace at any classpath.
