@@ -91,7 +91,7 @@ stages the `.kotoba` sources into a scratch tree under `.cljc` and runs them
 there; it holds the run to the counts published in the line above, and
 refuses (exit 2, never a pass) if fewer tests run than that.
 
-The suite needs a JVM even though CLAUDE.md ranks nbb above it: the parity
+The suite needs a JVM even though AGENTS.md ranks nbb above it: the parity
 test compiles the Kotoba module through `kotoba.compiler.core`, which amu
 publishes as `.clj`. The runner itself is nbb.
 
